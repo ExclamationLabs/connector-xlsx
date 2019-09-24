@@ -1,0 +1,1 @@
+Connid connector for XLSX parsing
