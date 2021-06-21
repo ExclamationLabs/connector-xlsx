@@ -40,7 +40,7 @@ public class Connector implements org.identityconnectors.framework.spi.Connector
 
     private Configuration configuration;
 
-    private Reader reader;
+    private ReadHandler readHandler;
 
     @Override
     public Configuration getConfiguration() {
@@ -53,7 +53,7 @@ public class Connector implements org.identityconnectors.framework.spi.Connector
         String filePath = ((Configuration) configuration).getFilePath();
 
         try {
-            this.reader = new Reader(filePath);
+            this.readHandler = new ReadHandler(filePath);
         } catch (IOException e) {
             throw new ConnectorIOException(e);
         }
@@ -64,20 +64,20 @@ public class Connector implements org.identityconnectors.framework.spi.Connector
     @Override
     public void dispose(){
         try {
-			reader.closeReader();
+			readHandler.closeReader();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-        reader = null;
+        readHandler = null;
     }
 
     @Override
     public void test() {
 
-        if (reader != null) {
+        if (readHandler != null) {
             try {
-				reader.closeReader();
+				readHandler.closeReader();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -85,63 +85,66 @@ public class Connector implements org.identityconnectors.framework.spi.Connector
         }
 
         try {
-            reader.openReader();
+            readHandler.openReader();
         } catch (IOException e) {
-            throw new ConnectorIOException("Unable to open XLSX Reader");
+            throw new ConnectorIOException("Unable to open XLSX ReadHandler");
         }
     }
 
     @Override
     public Schema schema() {
         SchemaBuilder schemaBuilder = new SchemaBuilder(Connector.class);
-
         ObjectClassInfoBuilder objectClassBuilderUser = new ObjectClassInfoBuilder();
+
+        List<String> mergeProperty = Arrays.asList(configuration.getMergeProperty()
+            .split(configuration.getMultivalueDelimiter())
+        );
+
         objectClassBuilderUser.setType(ObjectClass.ACCOUNT_NAME);
-        objectClassBuilderUser.addAttributeInfo(infoBuilder(Uid.NAME, configuration.getIdentifierProperty()));
-        objectClassBuilderUser.addAttributeInfo(infoBuilder(Name.NAME, configuration.getIdentifierProperty()));
-        objectClassBuilderUser.addAttributeInfo(infoBuilder(PredefinedAttributes.GROUPS_NAME, configuration.getGroupIdentifierProperty()));
-        for (String colName: reader.getHeading(configuration.getIncludesHeaderProperty())) {
-            if(!(colName.equals(configuration.getIdentifierProperty()) || colName.equals(configuration.getIdentifierProperty()))){
-                objectClassBuilderUser.addAttributeInfo(infoBuilder(colName,colName));
+        objectClassBuilderUser.addAttributeInfo(
+            identifierInfoBuilder(Uid.NAME, configuration.getIdentifierProperty()));
+        objectClassBuilderUser.addAttributeInfo(
+            identifierInfoBuilder(Name.NAME, configuration.getIdentifierProperty()));
+
+        for (String colName: readHandler.getHeading(configuration.getIncludesHeaderProperty())) {
+            if(!(colName.equals(configuration.getIdentifierProperty()))){
+                if(mergeProperty.contains(colName)){
+                    objectClassBuilderUser.addAttributeInfo(
+                        AttributeInfoBuilder.build(colName,
+                            String.class,
+                            EnumSet.of(AttributeInfo.Flags.MULTIVALUED))
+                    );
+                }else{
+                    objectClassBuilderUser.addAttributeInfo(
+                        AttributeInfoBuilder.build(colName,
+                            String.class)
+                    );
+                }
             }
         }
 
         ObjectClassInfo userOci = objectClassBuilderUser.build();
         schemaBuilder.defineObjectClass(userOci);
 
-        ObjectClassInfoBuilder objectClassBuilderGroup = new ObjectClassInfoBuilder();
-        objectClassBuilderGroup.setType(ObjectClass.GROUP_NAME);
-        objectClassBuilderGroup.addAttributeInfo(infoBuilder(Uid.NAME,configuration.getIdentifierProperty()));
-        objectClassBuilderGroup.addAttributeInfo(infoBuilder(Name.NAME,configuration.getIdentifierProperty()));
-
-        ObjectClassInfo groupOci = objectClassBuilderGroup.build();
-        schemaBuilder.defineObjectClass(groupOci);
-
-        schemaBuilder.defineOperationOption(OperationOptionInfoBuilder.buildAttributesToGet(), SearchOp.class);
+//        ObjectClassInfoBuilder objectClassBuilderGroup = new ObjectClassInfoBuilder();
+//        objectClassBuilderGroup.setType(ObjectClass.GROUP_NAME);
+//        objectClassBuilderGroup.addAttributeInfo(infoBuilder(Uid.NAME,configuration.getIdentifierProperty()));
+//        objectClassBuilderGroup.addAttributeInfo(infoBuilder(Name.NAME,configuration.getIdentifierProperty()));
+//
+//        ObjectClassInfo groupOci = objectClassBuilderGroup.build();
+//        schemaBuilder.defineObjectClass(groupOci);
+//
+//        schemaBuilder.defineOperationOption(OperationOptionInfoBuilder.buildAttributesToGet(), SearchOp.class);
 
         return schemaBuilder.build();
     }
 
-    private AttributeInfo infoBuilder(String name, String nativeName){
-        return infoBuilder(name, nativeName, true);
-    }
-
-    private AttributeInfo infoBuilder(String name, String nativeName, Boolean required){
-        return infoBuilder(name, nativeName, String.class, required, false);
-    }
-
-    private AttributeInfo infoBuilder(String name, String nativeName, Class<?> type, Boolean required, Boolean multi){
+    private AttributeInfo identifierInfoBuilder(String name, String nativeName){
         AttributeInfoBuilder info = new AttributeInfoBuilder(name);
         info.setNativeName(nativeName);
-        info.setType(type);
-        info.setRequired(required);
-        info.setCreateable(true);
-        info.setUpdateable(true);
-        info.setMultiValued(multi);
+        info.setRequired(true);
         return info.build();
     };
-
-
 
     @Override
     public FilterTranslator<Filter> createFilterTranslator(
@@ -160,30 +163,19 @@ public class Connector implements org.identityconnectors.framework.spi.Connector
             final OperationOptions options) {
 
         if (objectClass.equals(ObjectClass.ACCOUNT)) {
-            for (ConnectorObject accountConnectorObject : getConnectorObjectListOfAccounts()) {
-                handler.handle(accountConnectorObject);
-            }
+            readHandler.getAccounts(configuration, handler);
 
-        } else if (objectClass.equals(ObjectClass.GROUP)) {
-            for (ConnectorObject groupConnectorObject : getConnectorObjectListOfGroups()) {
-                handler.handle(groupConnectorObject);
-            }
-
-        } else {
+        }
+//        else if (objectClass.equals(ObjectClass.GROUP)) {
+//            for (ConnectorObject groupConnectorObject : getConnectorObjectListOfGroups()) {
+//                handler.handle(groupConnectorObject);
+//            }
+//        }
+        else {
             LOG.info("Unsupported objectClass {0} passed to query", objectClass.getDisplayNameKey());
             throw new IllegalArgumentException("Unsupported object class "+objectClass.getDisplayNameKey());
         }
 
-    }
-
-    private ConnectorObject getAccountConnectorObjectFromAccount(Account account) {
-        ConnectorObjectBuilder cob = new ConnectorObjectBuilder();
-        cob.setName(account.getIdentifier());
-        cob.setUid(account.getIdentifier());
-        cob.addAttribute(PredefinedAttributes.GROUPS_NAME, account.getGroups());
-        account.forEach(cob::addAttribute);
-
-        return cob.build();
     }
 
 
@@ -196,35 +188,21 @@ public class Connector implements org.identityconnectors.framework.spi.Connector
         return cob.build();
     }
 
-
-    private List<ConnectorObject> getConnectorObjectListOfAccounts() {
-        Collection<Account> users;
-        List<ConnectorObject> connectorObjects = new ArrayList<>();
-
-        users = reader.getAccounts(configuration);
-
-        for (Account account : users) {
-            connectorObjects.add(getAccountConnectorObjectFromAccount(account));
-        }
-
-        return connectorObjects;
-    }
-
-    private List<ConnectorObject> getConnectorObjectListOfGroups() {
-        Collection<Account> groups;
-        List<ConnectorObject> connectorObjects = new ArrayList<>();
-
-        groups = reader.getAccounts(configuration);
-        Set<String> groupNames = new HashSet<>();
-
-        for (Account account : groups) {
-            for (String group : account.getGroups()) {
-                if (groupNames.add(group)) {
-                    connectorObjects.add(getGroupConnectorObjectFromAccount(group));
-                }
-            }
-        }
-
-        return connectorObjects;
-    }
+//    private List<ConnectorObject> getConnectorObjectListOfGroups() {
+//        Collection<Account> groups;
+//        List<ConnectorObject> connectorObjects = new ArrayList<>();
+//
+//        groups = readHandler.getAccounts(configuration);
+//        Set<String> groupNames = new HashSet<>();
+//
+//        for (Account account : groups) {
+//            for (String group : account.getGroups()) {
+//                if (groupNames.add(group)) {
+//                    connectorObjects.add(getGroupConnectorObjectFromAccount(group));
+//                }
+//            }
+//        }
+//
+//        return connectorObjects;
+//    }
 }

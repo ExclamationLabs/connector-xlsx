@@ -39,16 +39,16 @@ public class ConnectorTests {
         return new Configuration();
     }
 
-    protected ConnectorFacade newFacade() {
-        ConnectorFacadeFactory factory = ConnectorFacadeFactory.getInstance();
+    protected APIConfiguration apiConfig() {
         APIConfiguration impl = TestHelpers.createTestConfiguration( Connector.class, newConfiguration());
         impl.getResultsHandlerConfiguration().setFilteredResultsHandlerInValidationMode(true);
         impl.getConfigurationProperties().setPropertyValue("directoryPathProperty","target/test-classes" );
-        impl.getConfigurationProperties().setPropertyValue("fileNameProperty","Employee Roles for MidPoint" );
+        impl.getConfigurationProperties().setPropertyValue("fileNameProperty","example" );
         impl.getConfigurationProperties().setPropertyValue("includesHeaderProperty",true );
-        impl.getConfigurationProperties().setPropertyValue("groupIdentifierProperty","Role Name" );
-        impl.getConfigurationProperties().setPropertyValue("identifierProperty","Employee Number" );
-        return factory.newInstance(impl);
+        impl.getConfigurationProperties().setPropertyValue("uidSortedProperty",true );
+        impl.getConfigurationProperties().setPropertyValue("mergeProperty","role" );
+        impl.getConfigurationProperties().setPropertyValue("identifierProperty","id" );
+        return impl;
     }
 
     public static SearchResultsHandler handler = new SearchResultsHandler() {
@@ -67,19 +67,23 @@ public class ConnectorTests {
 
     @Test
     public void schema() {
-        Schema schema = newFacade().schema();
+        ConnectorFacadeFactory factory = ConnectorFacadeFactory.getInstance();
+        Schema schema = factory.newInstance(apiConfig()).schema();
         Assert.assertNotNull(schema);
+        LOG.info(schema.toString());
     }
 
     @Test
     public void test() {
-        newFacade().test();
+        ConnectorFacadeFactory factory = ConnectorFacadeFactory.getInstance();
+        factory.newInstance(apiConfig()).test();
         Assert.assertTrue(true);
     }
 
     @Test
     public void validate() {
-        newFacade().validate();
+        ConnectorFacadeFactory factory = ConnectorFacadeFactory.getInstance();
+        factory.newInstance(apiConfig()).validate();
         Assert.assertTrue(true);
     }
 
@@ -87,21 +91,32 @@ public class ConnectorTests {
     public void search() {
         results = new ArrayList<>();
 
-        newFacade().search( ObjectClass.ACCOUNT, null, handler, null);
+        ConnectorFacadeFactory factory = ConnectorFacadeFactory.getInstance();
 
-        Assert.assertEquals(18, results.size());
+        factory.newInstance(apiConfig()).search( ObjectClass.ACCOUNT, null, handler, null);
+        Assert.assertEquals(10, results.size());
+    }
+    @Test
+    public void searchIgnore() {
+        results = new ArrayList<>();
+
+        ConnectorFacadeFactory factory = ConnectorFacadeFactory.getInstance();
+        APIConfiguration ignoreConfig = apiConfig();
+
+        ignoreConfig.getConfigurationProperties().setPropertyValue("ignoreProperty","active" );
+        ignoreConfig.getConfigurationProperties().setPropertyValue("ignoreValueProperty","FALSE" );
+
+        factory.newInstance(ignoreConfig).search( ObjectClass.ACCOUNT, null, handler, null);
+        Assert.assertEquals(5, results.size());
     }
 
     @Test(expected = ConnectorIOException.class)
     public void resourceFileNotFound() {
         ConnectorFacadeFactory factory = ConnectorFacadeFactory.getInstance();
-        APIConfiguration impl = TestHelpers.createTestConfiguration( Connector.class, newConfiguration());
+        APIConfiguration impl = apiConfig();
         impl.getResultsHandlerConfiguration().setFilteredResultsHandlerInValidationMode(true);
         impl.getConfigurationProperties().setPropertyValue("directoryPathProperty","target/test-classes/nodirectory" );
         impl.getConfigurationProperties().setPropertyValue("fileNameProperty","nofilehere" );
-        impl.getConfigurationProperties().setPropertyValue("includesHeaderProperty",true );
-        impl.getConfigurationProperties().setPropertyValue("groupIdentifierProperty","Role Name" );
-        impl.getConfigurationProperties().setPropertyValue("identifierProperty","Employee Number" );
 
         factory.newInstance(impl).schema();
 

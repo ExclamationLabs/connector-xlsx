@@ -29,8 +29,12 @@ public class Configuration extends AbstractConfiguration {
     private String directoryPathProperty;
     private String fileNameProperty;
     private String identifierProperty;
-    private String groupIdentifierProperty;
-    private Boolean includesHeaderProperty;
+    private String mergeProperty = "";
+    private String ignoreProperty;
+    private String ignoreValueProperty;
+    private String multivalueDelimiter = ";";
+    private Boolean includesHeaderProperty = false;
+    private Boolean uidSortedProperty = false;
 
     @ConfigurationProperty(
             displayMessageKey = "File Name",
@@ -109,18 +113,31 @@ public class Configuration extends AbstractConfiguration {
     }
 
     @ConfigurationProperty(
-            displayMessageKey = "Group Column Name",
+            displayMessageKey = "Merge Property",
             groupMessageKey ="XLSX Configuration",
-            helpMessageKey = "Group column name, if file does not include a header this would be colX",
+            helpMessageKey = "Properties to be merged if an account is listed multiple times, if file does not include a header this would be colX",
             order = 5,
             confidential = false,
-            required = true)
-    public String getGroupIdentifierProperty() {
-        return groupIdentifierProperty;
+            required = false)
+    public String getMergeProperty() {
+        return mergeProperty;
     }
 
-    public void setGroupIdentifierProperty(String groupIdentifierProperty) {
-        this.groupIdentifierProperty = groupIdentifierProperty;
+    public void setMergeProperty(String mergeProperty) {
+        this.mergeProperty = mergeProperty;
+    }
+
+    @ConfigurationProperty(
+            displayMessageKey = "Uid Sorted",
+            groupMessageKey ="XLSX Configuration",
+            helpMessageKey = "If items are sorted by Uid they will be handled individually, Default false",
+            order = 6)
+    public boolean isUidSortedProperty() {
+        return uidSortedProperty;
+    }
+
+    public void setUidSortedProperty(boolean uidSortedProperty) {
+        this.uidSortedProperty = uidSortedProperty;
     }
 
 
@@ -137,4 +154,48 @@ public class Configuration extends AbstractConfiguration {
         }
     }
 
+    @ConfigurationProperty(
+            displayMessageKey = "Multivalue Delimiter",
+            groupMessageKey ="XLSX Configuration",
+            helpMessageKey = "Character used to split multivalue attributes, default ;",
+            order = 7,
+            confidential = false,
+            required = false)
+    public String getMultivalueDelimiter() {
+        return multivalueDelimiter;
+    }
+
+    public void setMultivalueDelimiter(String multivalueDelimiter) {
+        this.multivalueDelimiter = multivalueDelimiter;
+    }
+
+    @ConfigurationProperty(
+            displayMessageKey = "Ignore Column",
+            groupMessageKey ="XLSX Configuration",
+            helpMessageKey = "Set to Row name to exclude based on value",
+            order = 8,
+            confidential = false,
+            required = false)
+    public String getIgnoreProperty() {
+        return ignoreProperty;
+    }
+
+    public void setIgnoreProperty(String ignoreProperty) {
+        this.ignoreProperty = ignoreProperty;
+    }
+
+    @ConfigurationProperty(
+            displayMessageKey = "Ignore Column Value",
+            groupMessageKey ="XLSX Configuration",
+            helpMessageKey = "Report value to ignore column",
+            order = 9,
+            confidential = false,
+            required = false)
+    public String getIgnoreValueProperty() {
+        return ignoreValueProperty;
+    }
+
+    public void setIgnoreValueProperty(String ignoreValueProperty) {
+        this.ignoreValueProperty = ignoreValueProperty;
+    }
 }

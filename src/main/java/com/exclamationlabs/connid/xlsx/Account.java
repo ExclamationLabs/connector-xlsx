@@ -16,16 +16,13 @@
 
 package com.exclamationlabs.connid.xlsx;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 @SuppressWarnings("serial")
-public class Account extends HashMap<String, String> {
+public class Account {
 
     private String identifier;
-    private List<String> groups = new ArrayList<>();
+    private HashMap<String, List<Object>> attributes = new HashMap<>();
 
     public Account(){}
 
@@ -37,16 +34,17 @@ public class Account extends HashMap<String, String> {
         this.identifier = identifier;
     }
 
-    public String[] getGroups() {
-        return groups.toArray(new String[0]);
+    public HashMap<String, List<Object>> getAttributes() {
+        return attributes;
     }
 
-    public void addGroup(String group) {
-        this.groups.add(group);
-    }
-
-    public void setGroups(String[] groups) {
-        this.groups = Arrays.asList(groups);
+    public void addAttribute(String attribute, String value) {
+        List<Object> existingValue = this.attributes.get(attribute);
+        if(existingValue == null){
+            this.attributes.put(attribute, new ArrayList<>(Arrays.asList(value)));
+        }else {
+            existingValue.add(value.trim());
+        }
     }
 
     @Override
@@ -56,22 +54,20 @@ public class Account extends HashMap<String, String> {
 
         Account that = (Account) o;
         if (identifier != null ? !identifier.equals(that.identifier) : that.identifier != null) return false;
-        return groups != null ? groups.equals(that.groups) : that.groups == null;
+        return attributes != null ? attributes.equals(that.attributes) : that.attributes == null;
     }
 
     @Override
     public int hashCode() {
         int result = identifier != null ? identifier.hashCode() : 0;
-        result = 31 * result + (groups != null ? groups.hashCode() : 0);
+        result = 31 * result + (attributes != null ? attributes.hashCode() : 0);
         return result;
     }
 
     @Override
     public String toString() {
-        return "Account{" +
+        return "Account:" +
                 "identifier='" + identifier + '\'' +
-                this.entrySet().toString() + '\'' +
-                ", groups='" + groups + '\'' +
-                '}';
+                ", attributes='" + attributes + '\'';
     }
 }
